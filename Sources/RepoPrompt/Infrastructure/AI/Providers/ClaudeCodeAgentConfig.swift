@@ -26,14 +26,24 @@ struct ClaudeCodeAgentConfig {
     let mcpStrictMode: Bool
     let toolSearchEnabled: Bool
     let effortLevel: ClaudeCodeEffortLevel?
+    let accountRoute: ClaudeCodeAccountRouting.Route?
 
     var processEnvironmentOverrides: [String: String] {
-        switch toolContext {
+        var environment: [String: String] = switch toolContext {
         case .agentRun, .terminal:
             MCPIntegrationHelper.claudeProcessEnvironmentOverrides
         case .discoverRun, .promptOnly:
             [:]
         }
+        if runtimeVariant == .standard {
+            environment.merge(ClaudeCodeAccountRouting.environmentOverrides(for: accountRoute)) { _, routeValue in routeValue }
+        }
+        return environment
+    }
+
+    var accountRemovedEnvironmentKeys: Set<String> {
+        let effectiveRoute = runtimeVariant == .standard ? accountRoute : nil
+        return ClaudeCodeAccountRouting.removedEnvironmentKeys(for: effectiveRoute)
     }
 
     var effortEnvironmentOverrides: [String: String] {
@@ -57,7 +67,8 @@ struct ClaudeCodeAgentConfig {
         disallowedBuiltInTools: [String]? = nil,
         mcpStrictMode: Bool? = nil,
         toolSearchEnabled: Bool? = nil,
-        effortLevel: ClaudeCodeEffortLevel? = nil
+        effortLevel: ClaudeCodeEffortLevel? = nil,
+        accountRoute: ClaudeCodeAccountRouting.Route? = nil
     ) -> ClaudeCodeAgentConfig {
         let defaults = UserDefaults.standard
         let resolvedPermission = sanitizePermissionMode(
@@ -88,7 +99,8 @@ struct ClaudeCodeAgentConfig {
             disallowedBuiltInTools: disallowedBuiltInTools,
             mcpStrictMode: resolvedStrictMode,
             toolSearchEnabled: resolvedToolSearch,
-            effortLevel: resolvedEffortLevel
+            effortLevel: resolvedEffortLevel,
+            accountRoute: accountRoute
         )
     }
 
@@ -114,7 +126,8 @@ struct ClaudeCodeAgentConfig {
         commandName: String? = nil,
         modelString: String? = nil,
         runtimeVariant: ClaudeCodeRuntimeVariant = .standard,
-        enableDebugLogging: Bool = false
+        enableDebugLogging: Bool = false,
+        accountRoute: ClaudeCodeAccountRouting.Route? = .worker
     ) -> ClaudeCodeAgentConfig {
         ClaudeCodeAgentConfig(
             commandName: commandName,
@@ -129,7 +142,8 @@ struct ClaudeCodeAgentConfig {
             disallowedBuiltInTools: nil,
             mcpStrictMode: true,
             toolSearchEnabled: false,
-            effortLevel: nil
+            effortLevel: nil,
+            accountRoute: accountRoute
         )
     }
 
@@ -149,7 +163,8 @@ struct ClaudeCodeAgentConfig {
         disallowedBuiltInTools: [String]?,
         mcpStrictMode: Bool,
         toolSearchEnabled: Bool,
-        effortLevel: ClaudeCodeEffortLevel?
+        effortLevel: ClaudeCodeEffortLevel?,
+        accountRoute: ClaudeCodeAccountRouting.Route?
     ) {
         let resolvedCommand = commandName ?? "claude"
         let modelSpecifier = ClaudeModelSpecifier(raw: modelString)
@@ -166,6 +181,7 @@ struct ClaudeCodeAgentConfig {
         self.toolContext = toolContext
         self.mcpStrictMode = mcpStrictMode
         self.toolSearchEnabled = toolSearchEnabled
+        self.accountRoute = accountRoute
         self.effortLevel = Self.isNoModelCompatibleBackend(runtimeVariant)
             ? nil
             : (modelSpecifier.explicitEffortLevel ?? effortLevel)

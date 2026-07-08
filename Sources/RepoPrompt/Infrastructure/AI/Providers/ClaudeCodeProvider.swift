@@ -29,6 +29,11 @@ struct ClaudeCLIOptions {
         return environment
     }
 
+    mutating func applyAccountRoute(_ route: ClaudeCodeAccountRouting.Route?) {
+        environmentOverrides.merge(ClaudeCodeAccountRouting.environmentOverrides(for: route)) { _, routeValue in routeValue }
+        removedEnvironmentKeys.formUnion(ClaudeCodeAccountRouting.removedEnvironmentKeys(for: route))
+    }
+
     func toTokens() -> [String] {
         var tokens: [String] = []
         if printMode { tokens.append("-p") }
@@ -251,12 +256,14 @@ final class ClaudeCodeProvider: AIProvider {
             options.model = launchEnvironment.effectiveModel
             options.environmentOverrides = launchEnvironment.environmentOverrides
             options.removedEnvironmentKeys = launchEnvironment.removedEnvironmentKeys
+            options.applyAccountRoute(nil)
             options.timeout = defaultRequestTimeout
             return options
         }
         let selection = try Self.resolveCLIModelSelection(for: model)
         options.model = selection.modelArgument
         options.effortLevel = selection.effortLevel
+        options.applyAccountRoute(.orchestrator)
         options.timeout = defaultRequestTimeout
         return options
     }
@@ -448,6 +455,7 @@ final class ClaudeCodeProvider: AIProvider {
                 timeout: options.timeout,
                 additionalEnvironment: additionalEnvironment,
                 additionalRemovedKeys: launchEnvironment.removedEnvironmentKeys
+                    .union(ClaudeCodeAccountRouting.removedEnvironmentKeys(for: nil))
             )
         } catch {
             throw mapProcessError(error)
@@ -526,7 +534,8 @@ final class ClaudeCodeProvider: AIProvider {
                 stdin: "User: Say OK\n",
                 outputMode: .auto(.json),
                 timeout: options.timeout,
-                additionalEnvironment: options.additionalEnvironment
+                additionalEnvironment: options.additionalEnvironment,
+                additionalRemovedKeys: options.removedEnvironmentKeys
             )
         } catch {
             throw mapProcessError(error)

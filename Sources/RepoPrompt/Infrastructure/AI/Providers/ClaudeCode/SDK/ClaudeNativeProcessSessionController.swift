@@ -2242,7 +2242,9 @@ final actor ClaudeNativeProcessSessionController {
         }
         return ProcessEnvironmentSanitizer.sanitizedForChildLaunch(
             env,
-            additionalRemovedKeys: Set(["NODE_OPTIONS"]).union(resolverRemovedKeys)
+            additionalRemovedKeys: Set(["NODE_OPTIONS"])
+                .union(config.accountRemovedEnvironmentKeys)
+                .union(resolverRemovedKeys)
         )
     }
 

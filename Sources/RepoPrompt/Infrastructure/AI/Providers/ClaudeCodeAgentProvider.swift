@@ -371,9 +371,9 @@ final class ClaudeCodeAgentProvider: HeadlessAgentProvider {
                             if self.enableDebugLogging {
                                 print("[DEBUG] ClaudeCodeAgent: Running CLI process")
                             }
-                            let additionalEnvironment = self.config.effortEnvironmentOverrides.merging(
-                                context.launchEnvironment?.environmentOverrides ?? [:]
-                            ) { _, resolverValue in resolverValue }
+                            let additionalEnvironment = self.config.processEnvironmentOverrides
+                                .merging(self.config.effortEnvironmentOverrides) { _, effortValue in effortValue }
+                                .merging(context.launchEnvironment?.environmentOverrides ?? [:]) { _, resolverValue in resolverValue }
                             let expectedPIDRunID = context.runID
                             let expectedPIDClientName = self.config.runtimeVariant.agentKind.mcpClientNameHint
                             let stream = try await self.runner.runStreaming(
@@ -382,7 +382,8 @@ final class ClaudeCodeAgentProvider: HeadlessAgentProvider {
                                 outputMode: .auto(.streamJson),
                                 timeout: 6000, // 100 minute timeout (matches Codex)
                                 additionalEnvironment: additionalEnvironment,
-                                additionalRemovedKeys: context.launchEnvironment?.removedEnvironmentKeys ?? [],
+                                additionalRemovedKeys: config.accountRemovedEnvironmentKeys
+                                    .union(context.launchEnvironment?.removedEnvironmentKeys ?? []),
                                 onProcessStarted: { pid in
                                     guard let expectedPIDClientName else { return }
                                     await ServerNetworkManager.shared.registerExpectedAgentPID(
